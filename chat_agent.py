@@ -1,26 +1,49 @@
 import streamlit as st
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from persona_config import build_system_prompt, ensure_system_message
-import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
+import os
+
 load_dotenv()
+
 MODEL = init_chat_model(
     model="deepseek-v4-flash",
     model_provider="openai",
     api_key="sk-68b6a5e0a7a7480d9104e1cd54abdd00",
     base_url="https://api.deepseek.com"
-                        )
+)
+
 # ========== 基础配置 ==========
 MAX_ROUNDS = 20
 
-SYSTEM_PROMPT = build_system_prompt()
+# ========== 从文件读取人格 ==========
+def load_persona():
+    file_path = os.path.join(os.path.dirname(__file__), "my_persona.txt")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
+SYSTEM_PROMPT = load_persona()
+
+
+# ========== 确保 system message ==========
+def ensure_system_message(messages, system_prompt):
+    if len(messages) == 0:
+        return [SystemMessage(content=system_prompt)]
+
+    if not isinstance(messages[0], SystemMessage):
+        return [SystemMessage(content=system_prompt)] + messages
+
+    return messages
+
 
 # ========== 初始化 ==========
 if "messages" not in st.session_state:
     st.session_state.messages = []
+    st.session_state.messages = ensure_system_message(
+        st.session_state.messages,
+        SYSTEM_PROMPT
+    )
 
-st.session_state.messages = ensure_system_message(st.session_state.messages, SYSTEM_PROMPT)
 
 # ========== 截断历史 ==========
 def trim_messages(msgs):
@@ -34,14 +57,14 @@ def trim_messages(msgs):
     return [system_msg] + history
 
 
-# ========== 页面配置 ==========
+# ========== 页面 ==========
 st.set_page_config(page_title="章子怡聊天", page_icon="💬", layout="centered")
 
 st.title("💬 章子怡")
-
 st.caption("微信风格虚拟聊天")
 
-# ========== 微信气泡样式 ==========
+
+# ========== CSS ==========
 st.markdown("""
 <style>
 .chat-container {
@@ -74,7 +97,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ========== 显示聊天记录 ==========
+# ========== 显示聊天 ==========
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
 for msg in st.session_state.messages[1:]:
@@ -85,21 +108,20 @@ for msg in st.session_state.messages[1:]:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ========== 输入框 ==========
+
+# ========== 输入 ==========
 user_input = st.chat_input("输入消息...")
 
 if user_input:
-    # 用户消息
     st.session_state.messages.append(HumanMessage(content=user_input))
 
-    # AI回复
+    # trim
+    st.session_state.messages = trim_messages(st.session_state.messages)
+
+    # AI response
     response = MODEL.invoke(st.session_state.messages)
     ai_text = response.content
 
     st.session_state.messages.append(AIMessage(content=ai_text))
 
-    # 截断历史
-    st.session_state.messages = trim_messages(st.session_state.messages)
-
-    # 刷新页面
     st.rerun()
