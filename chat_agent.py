@@ -9,7 +9,7 @@ load_dotenv()
 MODEL = init_chat_model(
     model="deepseek-v4-flash",
     model_provider="openai",
-    api_key="sk-68b6a5e0a7a7480d9104e1cd54abdd00",
+    api_key="sk-",
     base_url="https://api.deepseek.com"
 )
 
